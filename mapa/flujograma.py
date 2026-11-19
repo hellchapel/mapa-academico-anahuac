@@ -2,8 +2,9 @@
 Flujograma de la carrera como SVG: una fila por semestre, cajas del mismo tamaño
 y flechas de seriación que corren solo por los espacios entre materias.
 
-Cada materia intenta quedar en la misma columna que su prerrequisito, para que
-las cadenas seriadas se lean de arriba hacia abajo.
+Si se da una columna fija por materia (como en el mapa curricular), se respeta.
+Las materias sin columna fija (p. ej. creadas desde la app) toman el hueco libre
+de su fila más cercano a su prerrequisito.
 """
 
 from html import escape
@@ -124,11 +125,31 @@ def _acortar_flechas(materias, col, fila_de, columnas, semestres, rondas=30):
 
 
 
-def generar_svg(materias, estado):
-    """materias: filas de LISTAR_MATERIAS; estado(clave) -> aprobada|disponible|bloqueada."""
+def _columnas_fijas(materias, fijas):
+    """Usa la columna fija de cada materia; las demás van al hueco libre más cercano."""
+    semestres = sorted({m["semestre"] for m in materias})
+    col = {m["clave"]: fijas[m["clave"]] for m in materias if m["clave"] in fijas}
+    for s in semestres:
+        ocupadas = {col[m["clave"]] for m in materias if m["semestre"] == s and m["clave"] in col}
+        for m in (x for x in materias if x["semestre"] == s and x["clave"] not in col):
+            previas = [col[p] for p in m["prerrequisitos"] if p in col]
+            objetivo = previas[0] if previas else 0
+            c = min((c for c in range(len(materias)) if c not in ocupadas),
+                    key=lambda c: (abs(c - objetivo), c))
+            col[m["clave"]] = c
+            ocupadas.add(c)
+    return col, max(col.values()) + 1, semestres
+
+
+def generar_svg(materias, estado, fijas=None):
+    """materias: filas de LISTAR_MATERIAS; estado(clave) -> aprobada|disponible|bloqueada;
+    fijas: {clave: columna} opcional para acomodar como en el mapa curricular."""
     if not materias:
         return ""
-    col, columnas, semestres = _asignar_columnas(materias)
+    if fijas:
+        col, columnas, semestres = _columnas_fijas(materias, fijas)
+    else:
+        col, columnas, semestres = _asignar_columnas(materias)
     fila = {m["clave"]: semestres.index(m["semestre"]) for m in materias}
 
     def x(c):
@@ -218,7 +239,7 @@ def generar_svg(materias, estado):
     return (
         f'<div style="overflow-x:auto;padding:4px 0">'
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {ancho} {alto}" width="100%" '
-        f'style="min-width:1100px;font-family:Montserrat,Roboto,sans-serif" role="img" '
+        f'style="max-width:100%;font-family:Montserrat,Roboto,sans-serif" role="img" '
         f'aria-label="Flujograma de la carrera por semestre">'
         + "".join(etiquetas) + "".join(lineas) + "".join(cajas) + "</svg></div>"
     )

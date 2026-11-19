@@ -15,7 +15,7 @@ from mapa import queries as q
 from mapa import tema
 from mapa.db import get_driver
 from mapa.flujograma import generar_svg
-from seed.datos import CARRERA, PERIODO_HISTORIAL
+from seed.datos import CARRERA, COLUMNA, PERIODO_HISTORIAL
 
 LOGO = Path(__file__).parent / "assets" / "logo-anahuac-mayab.png"
 
@@ -99,10 +99,6 @@ with tab_avance:
             (critica["semestres_minimos"], "Semestres mínimos restantes"),
         ]))
 
-        if critica["cadena"]:
-            st.markdown("**Materias seriadas pendientes:** " + " → ".join(critica["cadena"]))
-            st.caption("Cada una desbloquea la siguiente, así que no se pueden llevar al mismo tiempo.")
-
         tabla(av["por_semestre"], {
             "semestre": "Semestre", "materias": "Materias", "aprobadas": "Aprobadas",
             "creditos": "Créditos", "creditos_aprobados": "Créditos aprobados"})
@@ -116,7 +112,7 @@ with tab_avance:
                 return "aprobada"
             return "disponible" if clave in libres else "bloqueada"
 
-        st.markdown(generar_svg(materias, estado), unsafe_allow_html=True)
+        st.markdown(generar_svg(materias, estado, COLUMNA), unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # ¿Qué puedo tomar?
