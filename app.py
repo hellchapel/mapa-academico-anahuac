@@ -166,7 +166,7 @@ with tab_materia:
     origen = c1.selectbox("Desde", list(nombre_materia), format_func=fmt_materia, key="origen",
                           index=indice("Algoritmos y programación"))
     meta = c2.selectbox("Hasta", list(nombre_materia), format_func=fmt_materia, key="meta",
-                        index=indice("Practicum de informática II"))
+                        index=indice("Practicum de tecnologías de la información II"))
     if st.button("Buscar ruta", key="buscar_ruta"):
         ruta = q.ruta_entre_materias(origen, meta) if origen != meta else None
         if ruta:

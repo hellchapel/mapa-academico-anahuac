@@ -10,7 +10,7 @@ Aplicación web que modela el plan de estudios de **Ingeniería en Tecnologías 
 
 Paradigma NoSQL: **Red / Grafo** · Motor: **Neo4j AuraDB Free** · Driver: `neo4j` (oficial, Python) · UI: Streamlit.
 
-> Materias, créditos y semestres: plan de referencia 2020-2025 de ITND de la Universidad Anáhuac (sin electivas genéricas). La seriación es aproximada y las claves (IT101...) son internas; ajústalas en `seed/datos.py`. Profesores y alumnos son **ficticios**.
+> Materias, créditos y semestres: plan de referencia 2020-2025 de ITND de la Universidad Anáhuac (con remediales y talleres; sin espacios de electiva libres). La seriación es aproximada y las claves (IT101...) son internas; ajústalas en `seed/datos.py`. Profesores y alumnos son **ficticios**.
 
 ## Requisitos
 

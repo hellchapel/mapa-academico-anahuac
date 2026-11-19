@@ -13,7 +13,7 @@ from mapa.tema import PALETA
 CAJA_W, CAJA_H = 150, 88
 HUECO_X, HUECO_Y = 26, 36
 ETIQUETA_W, MARGEN = 92, 12
-CARACTERES_POR_LINEA, MAX_LINEAS = 17, 3
+CARACTERES_POR_LINEA, MAX_LINEAS = 17, 4
 
 ESTILO = {
     "aprobada": {"fondo": PALETA["cafe"], "borde": PALETA["cafe"], "texto": "#FFFFFF", "sub": "#F3DCC8"},
@@ -25,7 +25,7 @@ ESTILO = {
 
 
 def _partir(nombre):
-    """Parte el nombre en renglones de ~20 caracteres, máximo 3."""
+    """Parte el nombre en renglones de ~17 caracteres, máximo 4."""
     renglones, actual = [], ""
     for palabra in nombre.split():
         prueba = f"{actual} {palabra}".strip()
@@ -198,10 +198,11 @@ def generar_svg(materias, estado):
         e = ESTILO[estado(m["clave"])]
         bx, by = x(col[m["clave"]]), y(fila[m["clave"]])
         renglones = _partir(m["nombre"])
+        salto = 15 if len(renglones) <= 3 else 13.5
         texto = "".join(
-            f'<tspan x="{bx + CAJA_W / 2}" dy="{0 if i == 0 else 15}">{escape(t)}</tspan>'
+            f'<tspan x="{bx + CAJA_W / 2}" dy="{0 if i == 0 else salto}">{escape(t)}</tspan>'
             for i, t in enumerate(renglones))
-        y0 = by + 22 + (3 - len(renglones)) * 7.5
+        y0 = by + 22 + (3 - len(renglones)) * 7.5 if len(renglones) <= 3 else by + 17
         cajas.append(
             f'<g><title>{escape(m["clave"])} · {escape(m["nombre"])}</title>'
             f'<rect x="{bx}" y="{by}" width="{CAJA_W}" height="{CAJA_H}" rx="10" '
