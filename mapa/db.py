@@ -32,7 +32,7 @@ def _config():
         )
     if uri.startswith(("bolt://localhost", "neo4j://localhost", "bolt://127.", "neo4j://127.")):
         raise RuntimeError("La tarea exige una base en la nube: usa la URI de AuraDB (neo4j+s://...).")
-    return uri, user, password, os.getenv("NEO4J_DATABASE", "neo4j")
+    return uri, user, password, os.getenv("NEO4J_DATABASE") or None
 
 
 @lru_cache(maxsize=1)
