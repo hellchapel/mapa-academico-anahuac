@@ -52,12 +52,6 @@ def cargar():
     """, dict(pares=[[c, p] for c, _, _, _, pres in datos.MATERIAS for p in pres]), write=True)
 
     run("""
-        UNWIND $pares AS par
-        MATCH (m:Materia {clave: par[0]}), (co:Materia {clave: par[1]})
-        MERGE (m)-[:CORREQUISITO]->(co)
-    """, dict(pares=[list(p) for p in datos.CORREQUISITOS]), write=True)
-
-    run("""
         UNWIND $profesores AS fila
         MERGE (p:Profesor {id: fila.id})
         SET p.nombre = fila.nombre, p.departamento = fila.departamento
@@ -67,19 +61,6 @@ def cargar():
         MERGE (p)-[:PUEDE_IMPARTIR]->(m)
     """, dict(profesores=[
         dict(id=i, nombre=n, departamento=d, materias=ms) for i, n, d, ms in datos.PROFESORES
-    ]), write=True)
-
-    run("""
-        UNWIND $grupos AS fila
-        MATCH (m:Materia {clave: fila.materia}), (p:Profesor {id: fila.profesor})
-        MERGE (g:Grupo {clave: fila.clave})
-        SET g.periodo = $periodo, g.horario = fila.horario, g.salon = fila.salon,
-            g.cupo = fila.cupo
-        MERGE (g)-[:DE_MATERIA]->(m)
-        MERGE (p)-[:IMPARTE]->(g)
-    """, dict(periodo=datos.PERIODO_OFERTA, grupos=[
-        dict(clave=c, materia=m, profesor=p, horario=h, salon=s, cupo=cu)
-        for c, m, p, h, s, cu in datos.GRUPOS
     ]), write=True)
 
     run("""

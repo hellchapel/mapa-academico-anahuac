@@ -1,5 +1,19 @@
 [server]
 headless = true
 
+# Paleta tomada del logo de la Anáhuac Mayab: café, naranja y tonos durazno.
 [theme]
-primaryColor = "#E35205"
+base = "light"
+primaryColor = "#FD8204"
+backgroundColor = "#FFF7F0"
+secondaryBackgroundColor = "#FFE9D6"
+textColor = "#3B2213"
+borderColor = "#F3D9C3"
+baseRadius = "medium"
+font = "Montserrat:https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+headingFont = "Montserrat:https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FFF3E8"
+textColor = "#3B2213"

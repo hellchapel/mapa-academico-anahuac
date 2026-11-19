@@ -5,7 +5,7 @@ Las credenciales se leen de variables de entorno:
   NEO4J_URI       p. ej. neo4j+s://xxxxxxxx.databases.neo4j.io
   NEO4J_USERNAME  normalmente "neo4j"
   NEO4J_PASSWORD
-  NEO4J_DATABASE  opcional, por defecto "neo4j"
+  NEO4J_DATABASE  opcional; si falta, se usa la base por defecto del usuario
 
 En GitHub Codespaces se configuran como *secrets*; en local, en un archivo .env.
 

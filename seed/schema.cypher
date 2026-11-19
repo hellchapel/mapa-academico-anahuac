@@ -13,9 +13,3 @@ FOR (p:Profesor) REQUIRE p.id IS UNIQUE;
 
 CREATE CONSTRAINT alumno_matricula IF NOT EXISTS
 FOR (a:Alumno) REQUIRE a.matricula IS UNIQUE;
-
-CREATE CONSTRAINT grupo_clave IF NOT EXISTS
-FOR (g:Grupo) REQUIRE g.clave IS UNIQUE;
-
-CREATE INDEX grupo_periodo IF NOT EXISTS
-FOR (g:Grupo) ON (g.periodo);

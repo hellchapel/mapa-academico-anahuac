@@ -1,18 +1,16 @@
 # Mapa Académico Anáhuac Mayab
 
-Aplicación web que modela el plan de estudios de **Ingeniería en Sistemas y Tecnologías de Información** como un grafo en **Neo4j AuraDB** (nube). Permite a un alumno:
+Aplicación web que modela el plan de estudios de **Ingeniería en Tecnologías de la Información y Negocios Digitales** (Anáhuac Mayab) como un grafo en **Neo4j AuraDB** (nube). Permite a un alumno:
 
-- ver su avance (créditos, materias y un flujograma de la carrera coloreado por estado),
-- saber **qué materias puede inscribir** según la seriación y **qué profesores** las pueden impartir,
-- explorar la cadena completa de prerrequisitos de una materia, lo que desbloquea al aprobarla y la ruta de seriación entre dos materias,
+- ver su avance (barra de progreso, créditos, materias y un flujograma por semestre coloreado por estado),
+- saber **qué materias puede tomar** según la seriación y **qué profesores** las pueden impartir,
+- explorar la cadena completa de prerrequisitos de una materia, quién la imparte y la ruta de seriación entre dos materias,
 - calcular su **ruta crítica**: el mínimo de semestres que le faltan por seriación,
-- encontrar **profesores suplentes** (que comparten materias),
-- inscribirse a grupos validando prerrequisitos y cupo,
 - administrar alumnos, profesores, materias e historial (CRUD completo).
 
 Paradigma NoSQL: **Red / Grafo** · Motor: **Neo4j AuraDB Free** · Driver: `neo4j` (oficial, Python) · UI: Streamlit.
 
-> Materias, claves, créditos y seriaciones: plan de referencia 2025 de ISTI de la Universidad Anáhuac. Profesores, alumnos y grupos son **ficticios**.
+> Materias, créditos y semestres: plan de referencia 2020-2025 de ITND de la Universidad Anáhuac (sin electivas genéricas). La seriación es aproximada y las claves (IT101...) son internas; ajústalas en `seed/datos.py`. Profesores y alumnos son **ficticios**.
 
 ## Requisitos
 
@@ -52,8 +50,12 @@ En Codespaces, al correr Streamlit aparece un aviso para abrir el puerto 8501 en
 app.py                 Interfaz web (Streamlit)
 mapa/db.py             Conexión con el driver oficial de Neo4j
 mapa/queries.py        Catálogo de consultas Cypher (CRUD y consultas de grafo)
+mapa/flujograma.py     Dibuja el flujograma (SVG) por filas de semestre
+mapa/tema.py           Paleta de colores y piezas visuales
 seed/schema.cypher     Constraints de unicidad e índices
-seed/datos.py          Datos iniciales (plan de estudios, profesores, alumnos, grupos)
+seed/datos.py          Datos iniciales (plan de estudios, profesores, alumnos)
+assets/                Logo de la universidad
+.streamlit/config.toml Tema: colores del logo y tipografía Montserrat
 seed/seed.py           Script de seeding (idempotente, usa MERGE)
 .devcontainer/         Configuración de GitHub Codespaces
 ```
@@ -63,23 +65,19 @@ seed/seed.py           Script de seeding (idempotente, usa MERGE)
 ```
 (:Carrera)-[:INCLUYE {semestre}]->(:Materia)
 (:Materia)-[:REQUIERE]->(:Materia)                 prerrequisito
-(:Materia)-[:CORREQUISITO]->(:Materia)             requisito concurrente
 (:Profesor)-[:PUEDE_IMPARTIR]->(:Materia)
-(:Profesor)-[:IMPARTE]->(:Grupo)-[:DE_MATERIA]->(:Materia)
 (:Alumno)-[:ESTUDIA]->(:Carrera)
 (:Alumno)-[:APROBO {calificacion, periodo}]->(:Materia)
-(:Alumno)-[:INSCRITO_EN]->(:Grupo)
 ```
 
 ## Consultas de grafo principales
 
 | Función | Tipo | Qué responde |
 |---|---|---|
-| `disponibles` | vecindad + agregación | Materias cuyos prerrequisitos ya están aprobados, con profesores y grupos |
+| `disponibles` | vecindad + agregación | Materias cuyos prerrequisitos ya están aprobados, con sus profesores |
 | `cadena_prerrequisitos` | traversal `[:REQUIERE*1..]` | Todo lo que necesitas antes de una materia |
-| `desbloquea` | traversal inverso | Todo lo que se abre al aprobar una materia |
 | `ruta_critica` | caminos `[:REQUIERE*0..]` | Cadena pendiente más larga = semestres mínimos restantes |
 | `ruta_entre_materias` | `shortestPath` | Ruta de seriación entre dos materias |
-| `suplentes` | vecindad a 2 saltos | Profesores que comparten materias |
+| `profesores_de_materia` | vecindad | Profesores que pueden impartir una materia |
 
 Todas están en `mapa/queries.py` con comentarios.

@@ -8,12 +8,9 @@ inyección de Cypher.
 Modelo:
   (:Carrera)-[:INCLUYE {semestre}]->(:Materia)
   (:Materia)-[:REQUIERE]->(:Materia)            prerrequisito
-  (:Materia)-[:CORREQUISITO]->(:Materia)        requisito concurrente
   (:Profesor)-[:PUEDE_IMPARTIR]->(:Materia)
-  (:Profesor)-[:IMPARTE]->(:Grupo)-[:DE_MATERIA]->(:Materia)
   (:Alumno)-[:ESTUDIA]->(:Carrera)
   (:Alumno)-[:APROBO {calificacion, periodo}]->(:Materia)
-  (:Alumno)-[:INSCRITO_EN]->(:Grupo)
 """
 
 from mapa.db import run
@@ -232,8 +229,7 @@ DELETE r
 
 ELIMINAR_MATERIA = """
 MATCH (m:Materia {clave: $clave})
-OPTIONAL MATCH (g:Grupo)-[:DE_MATERIA]->(m)
-DETACH DELETE g, m
+DETACH DELETE m
 """
 
 
@@ -287,26 +283,17 @@ ORDER BY semestre
 """
 
 # ¿Qué puedo tomar? Materias no aprobadas cuyos prerrequisitos directos están
-# TODOS aprobados, con los profesores que pueden darla y los grupos abiertos.
+# TODOS aprobados, con los profesores que las pueden impartir.
 DISPONIBLES = """
 MATCH (a:Alumno {matricula: $matricula})-[:ESTUDIA]->(:Carrera)-[i:INCLUYE]->(m:Materia)
 WHERE NOT (a)-[:APROBO]->(m)
 OPTIONAL MATCH (m)-[:REQUIERE]->(pre:Materia)
 OPTIONAL MATCH (a)-[ok:APROBO]->(pre)
-WITH a, m, i, count(pre) AS requeridos, count(ok) AS cumplidos
+WITH m, i, count(pre) AS requeridos, count(ok) AS cumplidos
 WHERE requeridos = cumplidos
 OPTIONAL MATCH (prof:Profesor)-[:PUEDE_IMPARTIR]->(m)
-WITH a, m, i, collect(DISTINCT prof.nombre) AS profesores
-OPTIONAL MATCH (g:Grupo {periodo: $periodo})-[:DE_MATERIA]->(m)
-OPTIONAL MATCH (titular:Profesor)-[:IMPARTE]->(g)
-OPTIONAL MATCH (a)-[ins:INSCRITO_EN]->(g)
 RETURN m.clave AS clave, m.nombre AS nombre, m.creditos AS creditos,
-       i.semestre AS semestre, profesores,
-       collect(CASE WHEN g IS NULL THEN NULL ELSE {
-           grupo: g.clave, horario: g.horario, salon: g.salon,
-           profesor: coalesce(titular.nombre, 'Por asignar'),
-           inscrito: ins IS NOT NULL
-       } END) AS grupos
+       i.semestre AS semestre, collect(prof.nombre) AS profesores
 ORDER BY semestre, clave
 """
 
@@ -317,14 +304,6 @@ MATCH camino = (:Materia {clave: $clave})-[:REQUIERE*1..]->(pre:Materia)
 WITH pre, min(length(camino)) AS nivel
 OPTIONAL MATCH (:Alumno {matricula: $matricula})-[r:APROBO]->(pre)
 RETURN pre.clave AS clave, pre.nombre AS nombre, nivel, r IS NOT NULL AS aprobada
-ORDER BY nivel, clave
-"""
-
-# ¿Qué me desbloquea? Traversal en sentido contrario: todas las materias que
-# dependen, directa o indirectamente, de la materia dada.
-DESBLOQUEA = """
-MATCH camino = (dep:Materia)-[:REQUIERE*1..]->(:Materia {clave: $clave})
-RETURN dep.clave AS clave, dep.nombre AS nombre, min(length(camino)) AS nivel
 ORDER BY nivel, clave
 """
 
@@ -352,25 +331,12 @@ RETURN [n IN reverse(nodes(camino)) | n.clave + ' · ' + n.nombre] AS ruta,
        length(camino) AS saltos
 """
 
-# Profesores que pueden impartir una materia y sus grupos del periodo.
+# Vecindad de una materia: profesores que la pueden impartir.
 PROFESORES_DE_MATERIA = """
-MATCH (p:Profesor)-[:PUEDE_IMPARTIR]->(m:Materia {clave: $clave})
-OPTIONAL MATCH (p)-[:IMPARTE]->(g:Grupo {periodo: $periodo})-[:DE_MATERIA]->(m)
-RETURN p.nombre AS profesor, p.departamento AS departamento,
-       collect(g.clave + ' (' + g.horario + ')') AS grupos
-ORDER BY size(grupos) DESC, profesor
+MATCH (p:Profesor)-[:PUEDE_IMPARTIR]->(:Materia {clave: $clave})
+RETURN p.nombre AS profesor, p.departamento AS departamento
+ORDER BY profesor
 """
-
-# Vecindad a 2 saltos: profesores que comparten materias con otro profesor
-# (posibles suplentes). Profesor -> Materia <- Profesor
-SUPLENTES = """
-MATCH (p:Profesor {id: $id})-[:PUEDE_IMPARTIR]->(m:Materia)<-[:PUEDE_IMPARTIR]-(otro:Profesor)
-WHERE otro <> p
-RETURN otro.nombre AS profesor, otro.departamento AS departamento,
-       count(m) AS en_comun, collect(m.nombre) AS materias
-ORDER BY en_comun DESC, profesor
-"""
-
 
 def avance(matricula):
     filas = run(AVANCE, dict(matricula=matricula))
@@ -386,16 +352,12 @@ def avance(matricula):
     }
 
 
-def disponibles(matricula, periodo):
-    return run(DISPONIBLES, dict(matricula=matricula, periodo=periodo))
+def disponibles(matricula):
+    return run(DISPONIBLES, dict(matricula=matricula))
 
 
 def cadena_prerrequisitos(clave, matricula):
     return run(CADENA_PRERREQUISITOS, dict(clave=clave, matricula=matricula))
-
-
-def desbloquea(clave):
-    return run(DESBLOQUEA, dict(clave=clave))
 
 
 def ruta_critica(matricula):
@@ -408,69 +370,5 @@ def ruta_entre_materias(origen, meta):
     return filas[0] if filas else None
 
 
-def profesores_de_materia(clave, periodo):
-    return run(PROFESORES_DE_MATERIA, dict(clave=clave, periodo=periodo))
-
-
-def suplentes(id):
-    return run(SUPLENTES, dict(id=id))
-
-
-# ---------------------------------------------------------------------------
-# Inscripción a grupos (con validación de seriación y cupo)
-# ---------------------------------------------------------------------------
-
-# Escribir una propiedad del grupo toma su lock de escritura antes de contar:
-# dos inscripciones simultáneas al mismo grupo se ejecutan una después de otra
-# y el cupo no se puede rebasar.
-INSCRIBIR = """
-MATCH (a:Alumno {matricula: $matricula}), (g:Grupo {clave: $grupo})
-SET g.ultima_inscripcion = timestamp()
-WITH a, g
-OPTIONAL MATCH (otro:Alumno)-[:INSCRITO_EN]->(g)
-WITH a, g, count(otro) AS ocupados
-WHERE ocupados < g.cupo
-MERGE (a)-[:INSCRITO_EN]->(g)
-RETURN g.clave AS grupo
-"""
-
-DAR_DE_BAJA = """
-MATCH (:Alumno {matricula: $matricula})-[r:INSCRITO_EN]->(:Grupo {clave: $grupo})
-DELETE r
-"""
-
-MIS_GRUPOS = """
-MATCH (:Alumno {matricula: $matricula})-[:INSCRITO_EN]->(g:Grupo)-[:DE_MATERIA]->(m:Materia)
-OPTIONAL MATCH (p:Profesor)-[:IMPARTE]->(g)
-RETURN g.clave AS grupo, m.nombre AS materia, g.horario AS horario, g.salon AS salon,
-       coalesce(p.nombre, 'Por asignar') AS profesor
-ORDER BY grupo
-"""
-
-
-MATERIA_DE_GRUPO = """
-MATCH (g:Grupo {clave: $grupo})-[:DE_MATERIA]->(m:Materia)
-RETURN m.clave AS clave
-"""
-
-
-def inscribir(matricula, grupo):
-    """Regresa (ok, motivo). Valida seriación antes de escribir y el cupo
-    dentro de la misma consulta de escritura."""
-    materia = run(MATERIA_DE_GRUPO, dict(grupo=grupo))
-    if not materia:
-        return False, "El grupo no existe."
-    faltan = run(PRERREQUISITOS_FALTANTES, dict(matricula=matricula, clave=materia[0]["clave"]))
-    if faltan:
-        return False, "Faltan prerrequisitos: " + ", ".join(f["nombre"] for f in faltan)
-    if not run(INSCRIBIR, dict(matricula=matricula, grupo=grupo), write=True):
-        return False, "El grupo ya no tiene cupo."
-    return True, ""
-
-
-def dar_de_baja(matricula, grupo):
-    run(DAR_DE_BAJA, dict(matricula=matricula, grupo=grupo), write=True)
-
-
-def mis_grupos(matricula):
-    return run(MIS_GRUPOS, dict(matricula=matricula))
+def profesores_de_materia(clave):
+    return run(PROFESORES_DE_MATERIA, dict(clave=clave))
