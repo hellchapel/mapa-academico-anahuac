@@ -1,0 +1,17 @@
+{
+  "name": "Mapa Académico (Python + Neo4j AuraDB)",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [8501],
+  "portsAttributes": {
+    "8501": { "label": "Mapa Académico", "onAutoForward": "openBrowser" }
+  },
+  "secrets": {
+    "NEO4J_URI": { "description": "URI de tu instancia AuraDB, p. ej. neo4j+s://xxxx.databases.neo4j.io" },
+    "NEO4J_USERNAME": { "description": "Usuario de AuraDB (normalmente neo4j)" },
+    "NEO4J_PASSWORD": { "description": "Contraseña que te dio AuraDB al crear la instancia" }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["ms-python.python"] }
+  }
+}
